@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -17,9 +18,13 @@ import (
 func Login(ctx *gin.Context) {
 	DB := common.GetDB()
 
+	var requestUser = model.User{}
+	// json.NewDecoder(ctx.Request.Body).Decode(&requestUser)
+	ctx.Bind(&requestUser)
+
 	// 获取参数
-	telephone := ctx.PostForm("telephone")
-	password := ctx.PostForm("password")
+	telephone := requestUser.Telephone //ctx.PostForm("telephone")
+	password := requestUser.Password   //ctx.PostForm("password")
 	// 数据验证
 	if len(telephone) != 11 {
 		response.Response(ctx, http.StatusUnprocessableEntity, 422, nil, "手机号必须为11位")
@@ -61,10 +66,12 @@ func Login(ctx *gin.Context) {
 func Register(ctx *gin.Context) {
 	DB := common.GetDB()
 
+	var requestUser = model.User{}
+	json.NewDecoder(ctx.Request.Body).Decode(&requestUser)
 	// 获取参数
-	name := ctx.PostForm("name")
-	telephone := ctx.PostForm("telephone")
-	password := ctx.PostForm("password")
+	name := requestUser.Name
+	telephone := requestUser.Telephone
+	password := requestUser.Password
 	// 数据验证
 	if len(telephone) != 11 {
 		response.Response(ctx, http.StatusUnprocessableEntity, 422, nil, "手机号必须为11位")
@@ -103,9 +110,18 @@ func Register(ctx *gin.Context) {
 	DB.Create(&newUser)
 
 	log.Println(newUser)
+	// 发放token
+	token, err := common.ReleaseToken(newUser)
+	if err != nil {
+		response.Fail(ctx, "系统异常", nil)
+		// ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "系统异常"})
+		log.Printf("token generate error: %v", err)
+		return
+	}
 
 	// 返回结果
-	response.Success(ctx, nil, "注册成功")
+	response.Success(ctx, gin.H{"token": token}, "注册成功")
+
 	// ctx.JSON(200, gin.H{
 	// 	"code":    200,
 	// 	"message": "注册成功",
